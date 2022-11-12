@@ -5,6 +5,7 @@ import numpy as np
 import utils as ut
 import config as cg
 import torch
+import torch.nn as nn
 import torch.optim as optim
 
 from tensorboardX import SummaryWriter
@@ -95,10 +96,6 @@ def main(args):
             loss = (loss_amodal_bce + loss_amodal_bound) + loss_order + loss_modal
             loss = loss / optim_freq
             loss.backward()
-            
-            
-                  
-            
                   
             # training set report to tensorboard
             if it % log_freq == 0:
@@ -130,7 +127,9 @@ def main(args):
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': loss,
                     }, filename)
-                optimizer.zero_grad()
+                
+            # gradient value clipping
+            nn.utils.clip_grad_value_(model.parameters(), clip_value=5.0)
                 
             # optimiser updates
             if it % optim_freq == 0:
