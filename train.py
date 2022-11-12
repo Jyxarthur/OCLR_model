@@ -171,17 +171,17 @@ if __name__ == "__main__":
     # training settings
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--lr', type=float, default=5e-5)
-    parser.add_argument('--num_train_steps', type=int, default=300000)
-    parser.add_argument('--warmup_steps', type=int, default=20000)
-    parser.add_argument('--decay_steps', type=int, default=40000)
-    parser.add_argument('--eval_freq', type=int, default=10000)
+    parser.add_argument('--num_train_steps', type=int, default=600000)
+    parser.add_argument('--warmup_steps', type=int, default=40000)
+    parser.add_argument('--decay_steps', type=int, default=80000)
+    parser.add_argument('--eval_freq', type=int, default=20000)
     parser.add_argument('--optim_freq', type=int, default=1)
     
     # input settings
     parser.add_argument('--queries', type=int, default=3)
     parser.add_argument('--dataset', type=str, default='Syn', choices=['Syn', 'DAVIS17m', 'DAVIS16', 'Segtrack', 'FBMS', 'MoCA'])
     parser.add_argument('--gaps', type=str, default='1,-1')  # Two flow gaps inputs, input string should not include space in-between.
-    parser.add_argument('--frames', type=int, default=5)
+    parser.add_argument('--frames', type=int, default=30)
     
     # paths
     parser.add_argument('--resume_path', type=str, default=None)
