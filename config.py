@@ -98,7 +98,6 @@ def setup_dataset(args):
         val_img_dir = val_basepath + '/JPEGImages/480p'
         val_gt_dir = val_basepath + '/Annotations/480p'
         val_flow_dir = val_basepath + '/Flows_gap1'
-        #val_seq = ['motocross-jump']
         val_seq = ['dog', 'cows', 'goat', 'camel', 'libby', 'parkour', 'soapbox', 'blackswan', 'bmx-trees', 
                     'kite-surf', 'car-shadow', 'breakdance', 'dance-twirl', 'scooter-black', 'drift-chicane', 
                     'motocross-jump', 'horsejump-high', 'drift-straight', 'car-roundabout', 'paragliding-launch']            
