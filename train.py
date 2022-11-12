@@ -11,20 +11,7 @@ from tensorboardX import SummaryWriter
 from argparse import ArgumentParser
 from models.oclr import OCLR
 from eval import eval
-from prettytable import PrettyTable
 
-
-def count_parameters(model):
-    table = PrettyTable(["Modules", "Parameters"])
-    total_params = 0
-    for name, parameter in model.named_parameters():
-        if not parameter.requires_grad: continue
-        params = parameter.numel()
-        table.add_row([name, params])
-        total_params+=params
-    print(table)
-    print(f"Total Trainable Params: {total_params}")
-    return total_params
 
 def main(args):
     lr = args.lr
@@ -62,13 +49,10 @@ def main(args):
         val_dataset, num_workers=8, batch_size=batch_size, shuffle=False, pin_memory=True, drop_last=False)
     
     # initialize model and optimiser
+    it = 0
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = OCLR(in_channels, out_channels, num_query = args.queries)
     model.to(device)
-    
-    count_parameters(model)
-    
-    
     optimizer = optim.Adam(model.parameters(), lr=lr)
     if resume_path:
         print('resuming from checkpoint')
@@ -85,7 +69,6 @@ def main(args):
     # main training iterations
     print('======> start training {}, use {}.'.format(args.dataset, device))
     timestart = time.time()
-    it = 0
     while it < num_it:
         for i, sample in enumerate(trn_loader):
             flow, gt_am, _ = sample

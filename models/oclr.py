@@ -109,8 +109,12 @@ class OCLR(nn.Module):
         btn_out = einops.rearrange(btn_out, 'b t h w c -> (b t) c h w')
         out_am = self.decoder_am(enc1, enc2, enc3, enc4, btn_out)
         out_am =  einops.rearrange(out_am, '(b t) c h w -> b t c h w', b = b)
+        out_am = torch.nan_to_num(out_am, nan = 0., posinf = 0., neginf = 0.) # Ignore unstable outputs appearing very occasionally.
+        
         out_order = self.classhead(btn_dec)
         b, t, c, _, _ = out_am.size()
         out_order = out_order[:, None].expand(b, t, c) # to: b t c, which copies the same global ordering for all frames.
+        out_order = torch.nan_to_num(out_order, nan = 0., posinf = 0., neginf = 0.)
+        
         return out_am, out_order
             
