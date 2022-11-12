@@ -56,7 +56,7 @@ Our segmentation results on several datasets (DAVIS2016, DAVIS2017-motion, SegTr
 
 #### Evaluation benchmarks:
 * For DAVIS2016, use the [DAVIS2016 official evaluator](https://github.com/fperazzi/davis).
-* For DAVIS2017-motion, once our curated annotations are downloaded from [here](https://drive.google.com/drive/folders/16zqUO1WuAp8Am4Giitc9hn2rMao6x_MA?usp=sharing), simply replace ```Annotation_unsupervised``` folder in the DAVIS2017 dataset. Then, [DAVIS2017 official evaluator](https://github.com/fperazzi/davis-2017) can be used to evaluate the **unsupervised** VOS performance.
+* For DAVIS2017-motion, once our curated annotations are downloaded from [here](https://drive.google.com/drive/folders/16zqUO1WuAp8Am4Giitc9hn2rMao6x_MA?usp=sharing), simply replace ```Annotations_unsupervised``` folder in the DAVIS2017 dataset. Then, [DAVIS2017 official evaluator](https://github.com/fperazzi/davis-2017) can be used to evaluate the **unsupervised** VOS performance.
 * For MoCA, use the evaluator provided in [motiongrouping](https://github.com/charigyang/motiongrouping).
 
 
