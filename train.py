@@ -80,6 +80,10 @@ def main(args):
 
             mask_am_raw, order_raw = model(flow)
             
+            # Ignore unstable outputs appearing very occasionally
+            mask_am_raw = torch.nan_to_num(mask_am_raw, nan = 0., posinf = 0., neginf = 0.) 
+            order_raw = torch.nan_to_num(order_raw, nan = 0., posinf = 0., neginf = 0.)
+            
             mask_am_raw, order_raw = ut.hungarian_matcher(mask_am_raw, gt_am, [mask_am_raw, order_raw]) # hungarian matching
 
             # amodal losses
@@ -129,7 +133,7 @@ def main(args):
                     }, filename)
                 
             # gradient value clipping
-            nn.utils.clip_grad_value_(model.parameters(), clip_value=5.0)
+            nn.utils.clip_grad_value_(model.parameters(), clip_value=2.0)
                 
             # optimiser updates
             if it % optim_freq == 0:

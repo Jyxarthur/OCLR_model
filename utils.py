@@ -194,7 +194,7 @@ def find_recon_factor(order_raw):
     tuidx = torch.triu_indices(c, c, 1).to(device)
     tmpr = 1
     order_raw_rel = order_raw_rel[:, :, tuidx[0], tuidx[1]] / tmpr # b t c
-    order_raw = torch.clamp(torch.sigmoid(order_raw_rel), 0., 1.)
+    order_raw = torch.clamp(torch.sigmoid(order_raw_rel), 1e-5, 1-1e-5)
     recon_fac = torch.prod(order_raw, 2)
     return recon_fac
     
@@ -427,7 +427,7 @@ def criterion_order(order_raw, mask_am):
         tuidx = torch.triu_indices(c, c, 1).to(device)
         tmpr = 1
         order_rel = order_rel[:, tuidx[0], tuidx[1]] / tmpr # b c, obtaining the pseudo-depth difference between every pairs of layers
-        order_rel = torch.clamp(torch.sigmoid(order_rel), 0., 1.)
+        order_rel = torch.clamp(torch.sigmoid(order_rel), 1e-5, 1-1e-5)
         loss_order = torch.mean(-(1 - (gt_order == 0.5).float()) * (gt_order * torch.log(order_rel) + (1 - gt_order) * torch.log(1 - order_rel)))
         return loss_order
 
