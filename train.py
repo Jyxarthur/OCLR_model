@@ -133,7 +133,7 @@ def main(args):
                     }, filename)
                 
             # gradient value clipping
-            nn.utils.clip_grad_value_(model.parameters(), clip_value=2.0)
+            nn.utils.clip_grad_value_(model.parameters(), clip_value=5.0)
                 
             # optimiser updates
             if it % optim_freq == 0:

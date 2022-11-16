@@ -385,7 +385,7 @@ def criterion_amodal_bound(mask_am_raw, gt_am):
     mask_am_boundary = mask_am_raw.sigmoid() * mask_boundary
     
     loss_bound = F.binary_cross_entropy(mask_am_boundary, gt_am_boundary)
-    loss_bound = loss_bound / (torch.sum(mask_am_boundary) + 1e-12) * (b * t * c * h * w)
+    loss_bound = loss_bound / (torch.sum(mask_boundary) + 1e-12) * (b * t * c * h * w)
     return loss_bound
 
 
