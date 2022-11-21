@@ -8,7 +8,7 @@ In *NeurIPS*, 2022.
 [[arXiv]](https://arxiv.org/abs/2207.02206)
 [[PDF]](https://www.robots.ox.ac.uk/~vgg/publications/2022/Xie22/xie22.pdf)
 [[Project Page]](https://www.robots.ox.ac.uk/~vgg/research/oclr/)
-[[Poster]](https://www.robots.ox.ac.uk/~vgg/research/oclr/resources/OCLR_neurips_poster.png)
+[[Poster]](https://www.robots.ox.ac.uk/~vgg/publications/2022/Xie22/poster.pdf)
 
 <p align="center">
   <img src="resources/teaser.PNG"  width="750"/>
