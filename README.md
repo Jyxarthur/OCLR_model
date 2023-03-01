@@ -49,7 +49,8 @@ The flow-only OCLR model pretrained on our synthetic dataset (Syn-train) can be 
 
 ## Inference
 ```
-python eval.py --queries 3 --gaps 1,-1 --batch_size 1 --frames 30 --dataset DAVIS17m --resume_path /path/to/ckpt --save_path /path/to/savepath
+python eval.py --queries 3 --gaps 1,-1 --batch_size 1 --frames 30 --dataset DAVIS17m \
+               --resume_path /path/to/ckpt --save_path /path/to/savepath
 ```
 where ```--resume_path``` indicates the checkpoint path, and ```--save_path``` corresponds to the saving path of segmentation results.
 

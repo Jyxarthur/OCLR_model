@@ -18,30 +18,19 @@ Main code structures are taken from https://github.com/facebookresearch/dino wit
 
 import os
 import copy
-import glob
 import queue
-from urllib.request import urlopen
+import torch
 import argparse
 import numpy as np
-from tqdm import tqdm
-import json
-
-import cv2
-import torch
-from torch.nn import functional as F
 from PIL import Image
+from tqdm import tqdm
+from urllib.request import urlopen
+from torch.nn import functional as F
+
 import utils
 import vision_transformer as vits
-
-
-@torch.no_grad()
-def extract_dino_features(model, frame_tars):
-    feat_tars = []
-    for frame_tar in frame_tars:
-        feat_tar = extract_feature(model, frame_tar)
-        feat_tars.append(feat_tar)
-    feat_tars = torch.stack(feat_tars, 0)
-    return feat_tars
+from dino_finetuning import dino_finetuning
+from data import extract_feature, read_seg, read_frame, read_frame_list, read_frame_list_bwd, read_frame_list_fwd
 
 def norm_mask(mask):
     c, h, w = mask.size()
@@ -53,17 +42,6 @@ def norm_mask(mask):
             mask[cnt,:,:] = mask_cnt
     return mask
 
-def extract_feature(model, frame, return_h_w=False):
-    """Extract one frame feature everytime."""
-    out = model.get_intermediate_layers(frame.unsqueeze(0).cuda(), n=1)[0]
-    out = out[:, 1:, :]  # we discard the [CLS] token
-    h, w = int(frame.shape[1] / model.patch_embed.patch_size), int(frame.shape[2] / model.patch_embed.patch_size)
-    dim = out.shape[-1]
-    out = out[0].reshape(h, w, dim)
-    out = out.reshape(-1, dim)
-    if return_h_w:
-        return out, h, w
-    return out
  
 @torch.no_grad()
 def check_consistency(args, model, frame_list, video_dir, first_seg, seg_ori, color_palette):
@@ -72,9 +50,9 @@ def check_consistency(args, model, frame_list, video_dir, first_seg, seg_ori, co
     Note: this is different from semi-supervised VOS, as no GT is used, and the propagtion results
     are not re-used but instead use flow-pred. masks for each round of propagation
     """
-    # The queue stores the n preceeding frames
+    # the queue stores the n preceeding frames
     que = queue.Queue(args.n_last_frames)
-    # Initialise an error list to record l1 loss for each frame
+    # initialise an error list to record l1 loss for each frame
     error_list = []
     # first frame
     frame1, ori_h, ori_w = read_frame(frame_list[0])
@@ -125,15 +103,12 @@ def eval_video_tracking_with_filter(args, model, frame_list, video_dir, first_se
     video_folder = os.path.join(args.output_path, video_dir.split('/')[-1])
     os.makedirs(video_folder, exist_ok=True)
 
-    # The queue stores the n preceeding frames
+    # the queue stores the n preceeding frames
     que = queue.Queue(args.n_last_frames)
-
     # first frame
     frame1, ori_h, ori_w = read_frame(frame_list[0])
     # extract first frame feature
     frame1_feat = extract_feature(model, frame1).T #  dim x h*w
-    #print(frame1_feat.size())
-    
     # saving first segmentation
     out_path = os.path.join(video_folder, frame_list[0].split('/')[-1].replace('.jpg', '.png'))
     imwrite_indexed(out_path, seg_ori, color_palette)
@@ -153,7 +128,6 @@ def eval_video_tracking_with_filter(args, model, frame_list, video_dir, first_se
         seg_path = os.path.join(args.seg_path, frame_list[cnt].split('/')[-2], frame_list[cnt].split('/')[-1].replace(".jpg", ".png"))
         framet_seg, _= read_seg(seg_path, args.patch_size)
         framet_seg = framet_seg.cuda()
-        #print(framet_seg.mean(dim = [-1, -2]))
         _, C, h, w = frame_tar_avg.size()
         
         # evaluate l1 loss between prop. results and flow pred. masks
@@ -163,7 +137,7 @@ def eval_video_tracking_with_filter(args, model, frame_list, video_dir, first_se
         if que.qsize() == args.n_last_frames:
             que.get()
             
-        # Dynamic refinement process: push current results or flow-pred. mask into queue
+        # dynamic refinement process: push current results or flow-pred. mask into queue
         # determined by the l1 error (evaluating consistency)
         if error < mean_error: # flow-pred. mask being consistent with propagated results
             seg = copy.deepcopy((framet_seg + frame_tar_avg) / 2)
@@ -183,7 +157,7 @@ def eval_video_tracking_with_filter(args, model, frame_list, video_dir, first_se
         imwrite_indexed(os.path.join(video_folder, frame_nm), frame_tar_seg, color_palette)
 
 def restrict_neighborhood(h, w):
-    # We restrict the set of source nodes considered to a spatial neighborhood of the query node (i.e. ``local attention'')
+    # we restrict the set of source nodes considered to a spatial neighborhood of the query node (i.e. ``local attention'')
     mask = torch.zeros(h, w, h, w)
     for i in range(h):
         for j in range(w):
@@ -202,17 +176,13 @@ def label_propagation(args, model, frame_tar, list_frame_feats, list_segs, mask_
     """
     propagate segs of frames in list_frames to frame_tar
     """
-    ## we only need to extract feature of the target frame
+    # we only need to extract feature of the target frame
     feat_tar, h, w = extract_feature(model, frame_tar, return_h_w=True)
-
     return_feat_tar = feat_tar.T # dim x h*w
-
     ncontext = len(list_frame_feats)
     feat_sources = torch.stack(list_frame_feats) # nmb_context x dim x h*w
-
     feat_tar = F.normalize(feat_tar, dim=1, p=2)
     feat_sources = F.normalize(feat_sources, dim=1, p=2)
-
     feat_tar = feat_tar.unsqueeze(0).repeat(ncontext, 1, 1)
     aff = torch.exp(torch.bmm(feat_tar, feat_sources) / 0.1) # nmb_context x h*w (tar: query) x h*w (source: keys)
     if args.size_mask_neighborhood > 0:
@@ -220,7 +190,6 @@ def label_propagation(args, model, frame_tar, list_frame_feats, list_segs, mask_
             mask_neighborhood = restrict_neighborhood(h, w)
             mask_neighborhood = mask_neighborhood.unsqueeze(0).repeat(ncontext, 1, 1)
         aff *= mask_neighborhood
-
     aff = aff.transpose(2, 1).reshape(-1, h * w) # nmb_context*h*w (source: keys) x h*w (tar: queries)
     tk_val, _ = torch.topk(aff, dim=0, k=args.topk)
     tk_val_min, _ = torch.min(tk_val, dim=0)
@@ -261,89 +230,6 @@ def imwrite_indexed(filename, array, color_palette):
     im.save(filename, format='PNG')
 
 
-def to_one_hot(y_tensor, n_dims=4):
-    """
-    Take integer y (tensor or variable) with n dims &
-    convert it to 1-hot representation with n+1 dims.
-    """
-    if(n_dims is None):
-        n_dims = int(y_tensor.max()+ 1)
-    _,h,w = y_tensor.size()
-    y_tensor = y_tensor.type(torch.LongTensor).view(-1, 1)
-    n_dims = n_dims if n_dims is not None else int(torch.max(y_tensor)) + 1
-    y_one_hot = torch.zeros(y_tensor.size()[0], n_dims).scatter_(1, y_tensor, 1)
-    y_one_hot = y_one_hot.view(h,w,n_dims)
-    return y_one_hot.permute(2, 0, 1).unsqueeze(0)
-
-def read_frame_list(video_dir):
-    frame_list = [img for img in glob.glob(os.path.join(video_dir,"*.jpg"))]
-    frame_list = sorted(frame_list)
-    return frame_list
-
-def read_frame_list_fwd(video_dir, n):
-    frame_list = [img for img in glob.glob(os.path.join(video_dir,"*.jpg"))]
-    frame_list = sorted(frame_list)
-    frame_list = frame_list[:n+1]
-    frame_list.reverse()
-    return frame_list
-
-def read_frame_list_bwd(video_dir, n):
-    frame_list = [img for img in glob.glob(os.path.join(video_dir,"*.jpg"))]
-    frame_list = sorted(frame_list)
-    frame_list = frame_list[n:]
-    return frame_list
-
-def read_frame(frame_dir, scale_size=[480]):
-    """
-    read a single frame & preprocess
-    """
-    img = cv2.imread(frame_dir)
-    ori_h, ori_w, _ = img.shape
-    if len(scale_size) == 1:
-        if(ori_h > ori_w):
-            tw = scale_size[0]
-            th = (tw * ori_h) / ori_w
-            th = int((th // 64) * 64)
-        else:
-            th = scale_size[0]
-            tw = (th * ori_w) / ori_h
-            tw = int((tw // 64) * 64)
-    else:
-        th, tw = scale_size
-    img = cv2.resize(img, (tw, th))
-    img = img.astype(np.float32)
-    img = img / 255.0
-    img = img[:, :, ::-1]
-    img = np.transpose(img.copy(), (2, 0, 1))
-    img = torch.from_numpy(img).float()
-    img = color_normalize(img)
-    return img, ori_h, ori_w
-
-def read_seg(seg_dir, factor, scale_size=[480]):
-    seg = Image.open(seg_dir)
-    _w, _h = seg.size # note PIL.Image.Image's size is (w, h)
-    if len(scale_size) == 1:
-        if(_w > _h):
-            _th = scale_size[0]
-            _tw = (_th * _w) / _h
-            _tw = int((_tw // 64) * 64)
-        else:
-            _tw = scale_size[0]
-            _th = (_tw * _h) / _w
-            _th = int((_th // 64) * 64)
-    else:
-        _th = scale_size[1]
-        _tw = scale_size[0]
-    small_seg = np.array(seg.resize((_tw // factor, _th // factor), 0))
-    small_seg = torch.from_numpy(small_seg.copy()).contiguous().float().unsqueeze(0)
-    return to_one_hot(small_seg), np.asarray(seg)
-
-def color_normalize(x, mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]):
-    for t, m, s in zip(x, mean, std):
-        t.sub_(m)
-        t.div_(s)
-    return x
-
       
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Evaluation with video object segmentation on DAVIS 2017')
@@ -357,10 +243,14 @@ if __name__ == '__main__':
         help="We restrict the set of source nodes considered to a spatial neighborhood of the query node")
     parser.add_argument("--topk", type=int, default=5, help="accumulate label from top k neighbors")
     parser.add_argument("--bs", type=int, default=6, help="Batch size, try to reduce if OOM")
+    
     parser.add_argument('--dataset', default='DAVIS17m', type=str)
-    parser.add_argument('--output_path', default=".", help='Path where to save segmentations')
-    parser.add_argument('--data_path', default='/path/to/dataset/', type=str)
-    parser.add_argument('--seg_path', default='/path/to/dataset/', type=str)
+    parser.add_argument('--data_path', default='/path/to/dataset/', type=str, help='Path where to read dataset info')
+    parser.add_argument('--seg_path', default='/path/to/segmask/', type=str, help='Path where to read flow-pred. masks')
+    parser.add_argument('--output_path', default='/path/to/output/', type=str, help='Path where to save segmentations')
+    parser.add_argument('--finetune_dino', action='store_true')
+    parser.add_argument('--ftckpt_path', default=None, type=str, help='Path where to save finetuned checkpoints')
+    
     args = parser.parse_args()
 
     print("git:\n  {}\n".format(utils.get_sha()))
@@ -371,14 +261,23 @@ if __name__ == '__main__':
     print(f"Model {args.arch} {args.patch_size}x{args.patch_size} built.")
     model.cuda()
     utils.load_pretrained_weights(model, args.pretrained_weights, args.checkpoint_key, args.arch, args.patch_size)  
-    for param in model.parameters():
-        param.requires_grad = False
+    
+    if args.finetune_dino:
+        # finetune last two layer of dino transformer
+        for names, param in model.named_parameters():
+            if 'blocks.10' in names or 'blocks.11' in names:
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+    else:
+        args.ftckpt_path = None
+        for param in model.parameters():
+            param.requires_grad = False
 
     # dataset information
     dataset = args.dataset
-
     if dataset == 'DAVIS17m':
-        # Specify whether it is a single-object or multi-object dataset
+        # specify whether it is a single-object or multi-object dataset
         dataset_objs = 'multi'
         video_list = ['bike-packing', 'blackswan', 'bmx-trees', 'breakdance', 'camel', 'car-roundabout', 'car-shadow',
                   'cows', 'dance-twirl', 'dog', 'dogs-jump', 'drift-chicane', 'drift-straight', 'goat', 'gold-fish',
@@ -451,8 +350,13 @@ if __name__ == '__main__':
         
         print("Check frame temporal consistency by propagation")
         prop_start_frame, error_list = check_consistency(args, model, frame_list, video_dir, first_seg, seg_ori, color_palette)
-        # Use as a threshold to filter out flow-pred. masks that are not temporally consistent
+        # use as a threshold to filter out flow-pred. masks that are not temporally consistent
         mean_error = np.mean(error_list)
+
+        if args.finetune_dino:
+            print("Finetuning DINO transformer")
+            model_ft = copy.deepcopy(model)
+            model = dino_finetuning(args, frame_list, model_ft, args.ftckpt_path)
         
         print("Forward propagation")
         frame_list_fwd = read_frame_list_fwd(video_dir, prop_start_frame)
@@ -465,4 +369,3 @@ if __name__ == '__main__':
         first_seg_path_bwd  = os.path.join(args.seg_path, frame_list_bwd[0].split('/')[-2], frame_list_bwd[0].split('/')[-1].replace("jpg", "png"))
         first_seg_bwd, seg_ori = read_seg(first_seg_path_bwd, args.patch_size)
         eval_video_tracking_with_filter(args, model, frame_list_bwd, video_dir, first_seg_bwd, seg_ori, color_palette, mean_error)
-       
