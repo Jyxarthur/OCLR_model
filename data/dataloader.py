@@ -102,7 +102,7 @@ class FlowLoader(Dataset):
                 
         outs = np.stack(outs, 0)
         seg_gts = np.stack(seg_gts, 0)
-        img_dir = [os.path.join(self.data_dir[2], i).replace('.jpg', '.png').split('/')[-2:] for i in smpl_names]
+        img_dir = [os.path.join(self.data_dir[1], i).replace('.jpg', '.png').split('/')[-2:] for i in smpl_names]
 
         return outs, seg_gts, img_dir
     
